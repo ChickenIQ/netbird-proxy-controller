@@ -78,8 +78,8 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	client := c.kube.CoreV1().Services(c.Namespace)
 	desired := sets.New[string]()
 
-	for cluster, p := range proxies {
-		for _, svc := range []*corev1ac.ServiceApplyConfiguration{c.loadBalancer(p), c.validation(cluster, p)} {
+	for _, p := range proxies {
+		for _, svc := range []*corev1ac.ServiceApplyConfiguration{c.loadBalancer(p), c.validation(p)} {
 			desired.Insert(*svc.Name)
 			if _, err := client.Apply(ctx, svc, applyOptions); err != nil {
 				return fmt.Errorf("apply service %s: %w", *svc.Name, err)

@@ -20,10 +20,10 @@ func (c *Controller) validate(ctx context.Context, p *proxy, d api.ReverseProxyD
 	}
 }
 
-func (c *Controller) validation(cluster string, p *proxy) *corev1ac.ServiceApplyConfiguration {
+func (c *Controller) validation(p *proxy) *corev1ac.ServiceApplyConfiguration {
 	spec := corev1ac.ServiceSpec().
 		WithType(corev1.ServiceTypeExternalName).
-		WithExternalName(cluster)
+		WithExternalName(p.cluster)
 
 	return c.service(p.pod+"-validation", p.pod, p.validations, spec)
 }

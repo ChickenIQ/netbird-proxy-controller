@@ -23,14 +23,16 @@ type proxy struct {
 	ports       map[string]*corev1ac.ServicePortApplyConfiguration
 	validations sets.Set[string]
 	hosts       sets.Set[string]
+	cluster     string
 	pod         string
 }
 
 func newProxy(pod, cluster string) *proxy {
 	p := &proxy{
 		ports:       map[string]*corev1ac.ServicePortApplyConfiguration{},
+		hosts:       sets.New(cluster, "*."+cluster),
 		validations: sets.New[string](),
-		hosts:       sets.New(cluster),
+		cluster:     cluster,
 		pod:         pod,
 	}
 
@@ -48,7 +50,9 @@ func (p *proxy) add(number int32, protocol corev1.Protocol) {
 }
 
 func (p *proxy) listen(s api.Service) {
-	p.hosts.Insert(s.Domain)
+	if label, ok := strings.CutSuffix(s.Domain, "."+p.cluster); !ok || strings.Contains(label, ".") {
+		p.hosts.Insert(s.Domain)
+	}
 
 	number := int32(ptr.Deref(s.ListenPort, 0))
 	if number == 0 {
