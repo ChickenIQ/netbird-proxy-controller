@@ -79,8 +79,8 @@ func (c *Controller) ensureToken(ctx context.Context) (*corev1.Secret, error) {
 func (c *Controller) statefulSet(secret *corev1.Secret) *appsv1ac.StatefulSetApplyConfiguration {
 	labels := map[string]string{"app.kubernetes.io/name": proxyName}
 
-	podName := corev1ac.EnvVarSource().
-		WithFieldRef(corev1ac.ObjectFieldSelector().WithFieldPath("metadata.name"))
+	podIndex := corev1ac.EnvVarSource().
+		WithFieldRef(corev1ac.ObjectFieldSelector().WithFieldPath("metadata.labels['apps.kubernetes.io/pod-index']"))
 
 	token := corev1ac.EnvVarSource().
 		WithSecretKeyRef(corev1ac.SecretKeySelector().WithName(tokenSecret).WithKey(tokenKey))
@@ -93,16 +93,16 @@ func (c *Controller) statefulSet(secret *corev1.Secret) *appsv1ac.StatefulSetApp
 		WithImage(c.Image).
 		WithName("proxy").
 		WithEnv(
-			env("POD_NAME").WithValueFrom(podName),
+			env("POD_INDEX").WithValueFrom(podIndex),
 			env("NB_PROXY_TOKEN").WithValueFrom(token),
 			env("NB_PROXY_WG_PORT").WithValue("65535"),
 			env("NB_PROXY_CERT_LOCK_METHOD").WithValue("flock"),
 			env("NB_PROXY_ACME_CERTIFICATES").WithValue("true"),
 			env("NB_PROXY_CERTIFICATE_DIRECTORY").WithValue(certsDir),
-			env("NB_PROXY_DOMAIN").WithValue(c.cluster("$(POD_NAME)")),
 			env("NB_PROXY_HEALTH_ADDRESS").WithValue("localhost:65534"),
 			env("NB_PROXY_MANAGEMENT_ADDRESS").WithValue(c.ManagementURL),
 			env("NB_PROXY_ADDRESS").WithValue(fmt.Sprintf(":%d", httpsPort)),
+			env("NB_PROXY_DOMAIN").WithValue(c.clusterDomain("$(POD_INDEX)")),
 		)
 
 	security := corev1ac.PodSecurityContext().

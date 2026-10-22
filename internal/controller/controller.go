@@ -59,8 +59,8 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 
 	proxies := map[string]*proxy{}
 	for i := range c.Replicas {
-		pod := fmt.Sprintf("%s-%d", proxyName, i)
-		proxies[c.cluster(pod)] = newProxy(pod, c.cluster(pod))
+		pod, cluster := fmt.Sprintf("%s-%d", proxyName, i), c.clusterDomain(fmt.Sprint(i))
+		proxies[cluster] = newProxy(pod, cluster)
 	}
 
 	for _, s := range services {
@@ -90,8 +90,8 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	return c.prune(ctx, desired)
 }
 
-func (c *Controller) cluster(pod string) string {
-	return pod + "." + c.Domain
+func (c *Controller) clusterDomain(index string) string {
+	return "proxy-" + index + "." + c.Domain
 }
 
 func (c *Controller) prune(ctx context.Context, desired sets.Set[string]) error {
