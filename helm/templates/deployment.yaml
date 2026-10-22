@@ -18,7 +18,7 @@ spec:
           image: {{ .Values.image | quote }}
           env:
             - name: NETBIRD_URL
-              value: {{ required "netbird.url is required" .Values.netbird.url | quote }}
+              value: {{ .Values.netbird.url | quote }}
             - name: NETBIRD_TOKEN
               valueFrom:
                 secretKeyRef:

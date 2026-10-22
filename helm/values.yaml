@@ -1,7 +1,7 @@
 image: ghcr.io/chickeniq/netbird-proxy-controller:latest
 
 netbird:
-  url: ""
+  url: https://api.netbird.io
   secret:
     name: netbird-proxy-controller
     key: token
