@@ -84,17 +84,27 @@ func (c *Controller) statefulSet() *appsv1ac.StatefulSetApplyConfiguration {
 
 	container := corev1ac.Container().
 		WithVolumeMounts(corev1ac.VolumeMount().WithName("certs").WithMountPath(certsDir)).
+		WithSecurityContext(corev1ac.SecurityContext().
+			WithCapabilities(corev1ac.Capabilities().WithDrop("ALL")).
+			WithAllowPrivilegeEscalation(false)).
 		WithImage(c.Image).
 		WithName("proxy").
 		WithEnv(
 			env("POD_NAME").WithValueFrom(podName),
 			env("NB_PROXY_TOKEN").WithValueFrom(token),
+			env("NB_PROXY_CERT_LOCK_METHOD").WithValue("flock"),
 			env("NB_PROXY_ACME_CERTIFICATES").WithValue("true"),
 			env("NB_PROXY_CERTIFICATE_DIRECTORY").WithValue(certsDir),
 			env("NB_PROXY_DOMAIN").WithValue(c.cluster("$(POD_NAME)")),
 			env("NB_PROXY_MANAGEMENT_ADDRESS").WithValue(c.ManagementURL),
 			env("NB_PROXY_ADDRESS").WithValue(fmt.Sprintf(":%d", httpsPort)),
 		)
+
+	security := corev1ac.PodSecurityContext().
+		WithSeccompProfile(corev1ac.SeccompProfile().WithType(corev1.SeccompProfileTypeRuntimeDefault)).
+		WithRunAsNonRoot(true).
+		WithRunAsUser(1000).
+		WithFSGroup(1000)
 
 	certs := corev1ac.PersistentVolumeClaim("certs", "").
 		WithSpec(corev1ac.PersistentVolumeClaimSpec().
@@ -110,7 +120,7 @@ func (c *Controller) statefulSet() *appsv1ac.StatefulSetApplyConfiguration {
 			WithServiceName(proxyName).
 			WithReplicas(c.Replicas).
 			WithTemplate(corev1ac.PodTemplateSpec().
-				WithSpec(corev1ac.PodSpec().WithContainers(container)).
+				WithSpec(corev1ac.PodSpec().WithSecurityContext(security).WithContainers(container)).
 				WithLabels(labels)))
 }
 
