@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      containers:
+        - name: controller
+          image: {{ .Values.image | quote }}
+          env:
+            - name: NETBIRD_URL
+              value: {{ required "netbird.url is required" .Values.netbird.url | quote }}
+            - name: NETBIRD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.netbird.secret.name }}
+                  key: {{ .Values.netbird.secret.key }}
+            - name: PROXY_IMAGE
+              value: {{ .Values.proxy.image | quote }}
+            - name: PROXY_REPLICAS
+              value: {{ .Values.proxy.replicas | quote }}

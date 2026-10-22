@@ -1,0 +1,11 @@
+image: ghcr.io/chickeniq/netbird-proxy-controller:latest
+
+netbird:
+  url: ""
+  secret:
+    name: netbird-proxy-controller
+    key: token
+
+proxy:
+  image: netbirdio/reverse-proxy:latest
+  replicas: 3

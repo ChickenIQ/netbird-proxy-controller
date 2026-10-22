@@ -1,0 +1,3 @@
+apiVersion: v2
+name: netbird-proxy-controller
+version: 0.1.0
