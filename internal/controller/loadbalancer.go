@@ -26,11 +26,11 @@ type proxy struct {
 	pod         string
 }
 
-func newProxy(pod string) *proxy {
+func newProxy(pod, cluster string) *proxy {
 	p := &proxy{
 		ports:       map[string]*corev1ac.ServicePortApplyConfiguration{},
 		validations: sets.New[string](),
-		hosts:       sets.New[string](),
+		hosts:       sets.New(cluster),
 		pod:         pod,
 	}
 

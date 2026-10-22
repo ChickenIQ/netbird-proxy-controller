@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	clusterSuffix      = ".internal"
 	proxyLabel         = "netbird.io/proxy"
 	hostnameAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 )
@@ -29,6 +28,7 @@ type Config struct {
 	Image         string
 	Replicas      int32
 	Namespace     string
+	Domain        string
 	ManagementURL string
 }
 
@@ -60,7 +60,7 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	proxies := map[string]*proxy{}
 	for i := range c.Replicas {
 		pod := fmt.Sprintf("%s-%d", proxyName, i)
-		proxies[c.cluster(pod)] = newProxy(pod)
+		proxies[c.cluster(pod)] = newProxy(pod, c.cluster(pod))
 	}
 
 	for _, s := range services {
@@ -91,7 +91,7 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 }
 
 func (c *Controller) cluster(pod string) string {
-	return pod + "." + c.Namespace + clusterSuffix
+	return pod + "." + c.Domain
 }
 
 func (c *Controller) prune(ctx context.Context, desired sets.Set[string]) error {

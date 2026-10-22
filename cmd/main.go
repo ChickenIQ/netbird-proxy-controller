@@ -48,6 +48,7 @@ func main() {
 		Labels:        mustMap("PROXY_SERVICE_LABELS"),
 		Image:         mustEnv("PROXY_IMAGE"),
 		Namespace:     string(namespace),
+		Domain:        mustEnv("PROXY_DOMAIN"),
 		Replicas:      int32(replicas),
 		ManagementURL: netbirdURL,
 	}

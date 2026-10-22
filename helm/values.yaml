@@ -9,6 +9,7 @@ netbird:
 proxy:
   image: netbirdio/reverse-proxy:latest
   replicas: 3
+  domain: ""
   service:
     annotations: {}
     labels: {}

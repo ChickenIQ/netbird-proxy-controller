@@ -52,7 +52,7 @@ func (c *Controller) ensureToken(ctx context.Context) (*corev1.Secret, error) {
 	}
 
 	for _, t := range tokens {
-		if t.Name != c.Namespace || t.Revoked {
+		if t.Name != c.Domain || t.Revoked {
 			continue
 		}
 
@@ -62,7 +62,7 @@ func (c *Controller) ensureToken(ctx context.Context) (*corev1.Secret, error) {
 		}
 	}
 
-	token, err := c.netbird.ReverseProxyTokens.Create(ctx, api.ProxyTokenRequest{Name: c.Namespace, ExpiresIn: new(0)})
+	token, err := c.netbird.ReverseProxyTokens.Create(ctx, api.ProxyTokenRequest{Name: c.Domain, ExpiresIn: new(0)})
 	if err != nil {
 		return nil, fmt.Errorf("create proxy token: %w", err)
 	}

@@ -36,7 +36,9 @@ spec:
               value: {{ .Values.proxy.image | quote }}
             - name: PROXY_REPLICAS
               value: {{ .Values.proxy.replicas | quote }}
-            - name: PROXY_SERVICE_ANNOTATIONS
-              value: {{ .Values.proxy.service.annotations | toJson | quote }}
             - name: PROXY_SERVICE_LABELS
               value: {{ .Values.proxy.service.labels | toJson | quote }}
+            - name: PROXY_SERVICE_ANNOTATIONS
+              value: {{ .Values.proxy.service.annotations | toJson | quote }}
+            - name: PROXY_DOMAIN
+              value: {{ required "proxy.domain is required" .Values.proxy.domain | quote }}
