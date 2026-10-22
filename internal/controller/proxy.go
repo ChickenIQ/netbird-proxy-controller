@@ -95,10 +95,12 @@ func (c *Controller) statefulSet(secret *corev1.Secret) *appsv1ac.StatefulSetApp
 		WithEnv(
 			env("POD_NAME").WithValueFrom(podName),
 			env("NB_PROXY_TOKEN").WithValueFrom(token),
+			env("NB_PROXY_WG_PORT").WithValue("65535"),
 			env("NB_PROXY_CERT_LOCK_METHOD").WithValue("flock"),
 			env("NB_PROXY_ACME_CERTIFICATES").WithValue("true"),
 			env("NB_PROXY_CERTIFICATE_DIRECTORY").WithValue(certsDir),
 			env("NB_PROXY_DOMAIN").WithValue(c.cluster("$(POD_NAME)")),
+			env("NB_PROXY_HEALTH_ADDRESS").WithValue("localhost:65534"),
 			env("NB_PROXY_MANAGEMENT_ADDRESS").WithValue(c.ManagementURL),
 			env("NB_PROXY_ADDRESS").WithValue(fmt.Sprintf(":%d", httpsPort)),
 		)

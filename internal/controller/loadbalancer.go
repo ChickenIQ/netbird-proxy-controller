@@ -19,63 +19,58 @@ const (
 	podNameLabel = "statefulset.kubernetes.io/pod-name"
 )
 
-type listener struct {
-	ports map[string]*corev1ac.ServicePortApplyConfiguration
-	hosts sets.Set[string]
+type proxy struct {
+	ports       map[string]*corev1ac.ServicePortApplyConfiguration
+	validations sets.Set[string]
+	hosts       sets.Set[string]
+	pod         string
 }
 
-func (c *Controller) loadBalancers(services []api.Service) []*corev1ac.ServiceApplyConfiguration {
-	listeners := map[string]*listener{}
-
-	for _, s := range services {
-		pod, ok := c.pod(ptr.Deref(s.ProxyCluster, ""))
-		if !s.Enabled || !ok {
-			continue
-		}
-
-		number, protocol := int32(ptr.Deref(s.ListenPort, 0)), corev1.ProtocolTCP
-		switch ptr.Deref(s.Mode, api.ServiceModeHttp) {
-		case api.ServiceModeHttp:
-			number = httpsPort
-		case api.ServiceModeUdp:
-			protocol = corev1.ProtocolUDP
-		}
-
-		if number == 0 {
-			continue
-		}
-
-		l := listeners[pod]
-		if l == nil {
-			l = &listener{ports: map[string]*corev1ac.ServicePortApplyConfiguration{}, hosts: sets.New[string]()}
-			listeners[pod] = l
-		}
-
-		name := fmt.Sprintf("%s-%d", strings.ToLower(string(protocol)), number)
-		l.ports[name] = corev1ac.ServicePort().
-			WithTargetPort(intstr.FromInt32(number)).
-			WithProtocol(protocol).
-			WithPort(number).
-			WithName(name)
-		l.hosts.Insert(s.Domain)
+func newProxy(pod string) *proxy {
+	p := &proxy{
+		ports:       map[string]*corev1ac.ServicePortApplyConfiguration{},
+		validations: sets.New[string](),
+		hosts:       sets.New[string](),
+		pod:         pod,
 	}
 
-	var svcs []*corev1ac.ServiceApplyConfiguration
-	for pod, l := range listeners {
-		svcs = append(svcs, c.loadBalancer(pod, l))
-	}
-
-	return svcs
+	p.add(httpsPort, corev1.ProtocolTCP)
+	return p
 }
 
-func (c *Controller) loadBalancer(pod string, l *listener) *corev1ac.ServiceApplyConfiguration {
+func (p *proxy) add(number int32, protocol corev1.Protocol) {
+	name := fmt.Sprintf("%s-%d", strings.ToLower(string(protocol)), number)
+	p.ports[name] = corev1ac.ServicePort().
+		WithTargetPort(intstr.FromInt32(number)).
+		WithProtocol(protocol).
+		WithPort(number).
+		WithName(name)
+}
+
+func (p *proxy) listen(s api.Service) {
+	p.hosts.Insert(s.Domain)
+
+	number := int32(ptr.Deref(s.ListenPort, 0))
+	if number == 0 {
+		return
+	}
+
+	switch ptr.Deref(s.Mode, api.ServiceModeHttp) {
+	case api.ServiceModeTcp, api.ServiceModeTls:
+		p.add(number, corev1.ProtocolTCP)
+	case api.ServiceModeUdp:
+		p.add(number, corev1.ProtocolUDP)
+	}
+}
+
+func (c *Controller) loadBalancer(p *proxy) *corev1ac.ServiceApplyConfiguration {
 	spec := corev1ac.ServiceSpec().
-		WithSelector(map[string]string{podNameLabel: pod}).
+		WithSelector(map[string]string{podNameLabel: p.pod}).
 		WithType(corev1.ServiceTypeLoadBalancer)
 
-	for _, name := range slices.Sorted(maps.Keys(l.ports)) {
-		spec.WithPorts(l.ports[name])
+	for _, name := range slices.Sorted(maps.Keys(p.ports)) {
+		spec.WithPorts(p.ports[name])
 	}
 
-	return c.service(pod, pod, l.hosts, spec)
+	return c.service(p.pod, p.pod, p.hosts, spec)
 }

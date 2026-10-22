@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/netbirdio/netbird/shared/management/client/rest"
+	"github.com/netbirdio/netbird/shared/management/http/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -55,13 +57,33 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 		return err
 	}
 
-	desired := sets.New[string]()
-	client := c.kube.CoreV1().Services(c.Namespace)
+	proxies := map[string]*proxy{}
+	for i := range c.Replicas {
+		pod := fmt.Sprintf("%s-%d", proxyName, i)
+		proxies[c.cluster(pod)] = newProxy(pod)
+	}
 
-	for _, svc := range append(c.loadBalancers(services), c.validations(ctx, domains)...) {
-		desired.Insert(*svc.Name)
-		if _, err := client.Apply(ctx, svc, applyOptions); err != nil {
-			return fmt.Errorf("apply service %s: %w", *svc.Name, err)
+	for _, s := range services {
+		if p := proxies[ptr.Deref(s.ProxyCluster, "")]; p != nil && s.Enabled {
+			p.listen(s)
+		}
+	}
+
+	for _, d := range domains {
+		if p := proxies[ptr.Deref(d.TargetCluster, "")]; p != nil && d.Type == api.ReverseProxyDomainTypeCustom {
+			c.validate(ctx, p, d)
+		}
+	}
+
+	client := c.kube.CoreV1().Services(c.Namespace)
+	desired := sets.New[string]()
+
+	for cluster, p := range proxies {
+		for _, svc := range []*corev1ac.ServiceApplyConfiguration{c.loadBalancer(p), c.validation(cluster, p)} {
+			desired.Insert(*svc.Name)
+			if _, err := client.Apply(ctx, svc, applyOptions); err != nil {
+				return fmt.Errorf("apply service %s: %w", *svc.Name, err)
+			}
 		}
 	}
 
@@ -70,17 +92,6 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 
 func (c *Controller) cluster(pod string) string {
 	return pod + "." + c.Namespace + clusterSuffix
-}
-
-func (c *Controller) pod(cluster string) (string, bool) {
-	for i := range c.Replicas {
-		pod := fmt.Sprintf("%s-%d", proxyName, i)
-		if cluster == c.cluster(pod) {
-			return pod, true
-		}
-	}
-
-	return "", false
 }
 
 func (c *Controller) prune(ctx context.Context, desired sets.Set[string]) error {
