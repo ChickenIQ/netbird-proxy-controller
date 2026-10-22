@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chickeniq/netbird-proxy/internal/controller"
+	"github.com/chickeniq/netbird-proxy-controller/internal/controller"
 	netbird "github.com/netbirdio/netbird/shared/management/client/rest"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"

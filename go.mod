@@ -1,4 +1,4 @@
-module github.com/chickeniq/netbird-proxy
+module github.com/chickeniq/netbird-proxy-controller
 
 go 1.26.9
 
