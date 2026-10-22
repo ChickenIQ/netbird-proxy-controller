@@ -9,3 +9,6 @@ netbird:
 proxy:
   image: netbirdio/reverse-proxy:latest
   replicas: 3
+  service:
+    annotations: {}
+    labels: {}

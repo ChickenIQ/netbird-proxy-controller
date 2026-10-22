@@ -2,6 +2,8 @@ package controller
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/netbirdio/netbird/shared/management/http/api"
@@ -17,18 +19,13 @@ const (
 	podNameLabel = "statefulset.kubernetes.io/pod-name"
 )
 
-type port struct {
-	pod    string
-	number int32
-}
-
 type listener struct {
-	protocols sets.Set[corev1.Protocol]
-	hosts     sets.Set[string]
+	ports map[string]*corev1ac.ServicePortApplyConfiguration
+	hosts sets.Set[string]
 }
 
 func (c *Controller) loadBalancers(services []api.Service) []*corev1ac.ServiceApplyConfiguration {
-	listeners := map[port]*listener{}
+	listeners := map[string]*listener{}
 
 	for _, s := range services {
 		pod, ok := c.pod(ptr.Deref(s.ProxyCluster, ""))
@@ -36,49 +33,49 @@ func (c *Controller) loadBalancers(services []api.Service) []*corev1ac.ServiceAp
 			continue
 		}
 
-		p, protocol := port{pod, int32(ptr.Deref(s.ListenPort, 0))}, corev1.ProtocolTCP
+		number, protocol := int32(ptr.Deref(s.ListenPort, 0)), corev1.ProtocolTCP
 		switch ptr.Deref(s.Mode, api.ServiceModeHttp) {
 		case api.ServiceModeHttp:
-			p.number = httpsPort
+			number = httpsPort
 		case api.ServiceModeUdp:
 			protocol = corev1.ProtocolUDP
 		}
 
-		if p.number == 0 {
+		if number == 0 {
 			continue
 		}
 
-		l := listeners[p]
+		l := listeners[pod]
 		if l == nil {
-			l = &listener{protocols: sets.New[corev1.Protocol](), hosts: sets.New[string]()}
-			listeners[p] = l
+			l = &listener{ports: map[string]*corev1ac.ServicePortApplyConfiguration{}, hosts: sets.New[string]()}
+			listeners[pod] = l
 		}
 
-		l.protocols.Insert(protocol)
+		name := fmt.Sprintf("%s-%d", strings.ToLower(string(protocol)), number)
+		l.ports[name] = corev1ac.ServicePort().
+			WithTargetPort(intstr.FromInt32(number)).
+			WithProtocol(protocol).
+			WithPort(number).
+			WithName(name)
 		l.hosts.Insert(s.Domain)
 	}
 
 	var svcs []*corev1ac.ServiceApplyConfiguration
-	for p, l := range listeners {
-		svcs = append(svcs, c.loadBalancer(p, l))
+	for pod, l := range listeners {
+		svcs = append(svcs, c.loadBalancer(pod, l))
 	}
 
 	return svcs
 }
 
-func (c *Controller) loadBalancer(p port, l *listener) *corev1ac.ServiceApplyConfiguration {
+func (c *Controller) loadBalancer(pod string, l *listener) *corev1ac.ServiceApplyConfiguration {
 	spec := corev1ac.ServiceSpec().
-		WithSelector(map[string]string{podNameLabel: p.pod}).
+		WithSelector(map[string]string{podNameLabel: pod}).
 		WithType(corev1.ServiceTypeLoadBalancer)
 
-	for _, protocol := range sets.List(l.protocols) {
-		spec.WithPorts(corev1ac.ServicePort().
-			WithName(strings.ToLower(string(protocol))).
-			WithTargetPort(intstr.FromInt32(p.number)).
-			WithProtocol(protocol).
-			WithPort(p.number))
+	for _, name := range slices.Sorted(maps.Keys(l.ports)) {
+		spec.WithPorts(l.ports[name])
 	}
 
-	name := fmt.Sprintf("%s-%d", p.pod, p.number)
-	return c.service(name, p.pod, strings.Join(sets.List(l.hosts), ","), spec)
+	return c.service(pod, pod, l.hosts, spec)
 }

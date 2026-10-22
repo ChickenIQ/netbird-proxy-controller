@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/netbirdio/netbird/shared/management/client/rest"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,8 @@ const (
 var applyOptions = metav1.ApplyOptions{FieldManager: proxyName, Force: true}
 
 type Config struct {
+	Annotations   map[string]string
+	Labels        map[string]string
 	Image         string
 	Replicas      int32
 	Namespace     string
@@ -102,9 +105,11 @@ func (c *Controller) prune(ctx context.Context, desired sets.Set[string]) error 
 	return nil
 }
 
-func (c *Controller) service(name, pod, hostnames string, spec *corev1ac.ServiceSpecApplyConfiguration) *corev1ac.ServiceApplyConfiguration {
+func (c *Controller) service(name, pod string, hosts sets.Set[string], spec *corev1ac.ServiceSpecApplyConfiguration) *corev1ac.ServiceApplyConfiguration {
 	return corev1ac.Service(name, c.Namespace).
-		WithAnnotations(map[string]string{hostnameAnnotation: hostnames}).
+		WithAnnotations(c.Annotations).
+		WithLabels(c.Labels).
+		WithAnnotations(map[string]string{hostnameAnnotation: strings.Join(sets.List(hosts), ",")}).
 		WithLabels(map[string]string{proxyLabel: pod}).
 		WithSpec(spec)
 }

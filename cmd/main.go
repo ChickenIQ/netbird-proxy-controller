@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -43,6 +44,8 @@ func main() {
 	}
 
 	cfg := controller.Config{
+		Annotations:   mustMap("PROXY_SERVICE_ANNOTATIONS"),
+		Labels:        mustMap("PROXY_SERVICE_LABELS"),
 		Image:         mustEnv("PROXY_IMAGE"),
 		Namespace:     string(namespace),
 		Replicas:      int32(replicas),
@@ -65,4 +68,13 @@ func mustEnv(name string) string {
 	}
 
 	return value
+}
+
+func mustMap(name string) map[string]string {
+	var m map[string]string
+	if err := json.Unmarshal([]byte(mustEnv(name)), &m); err != nil {
+		log.Fatalf("parse %s: %v", name, err)
+	}
+
+	return m
 }
